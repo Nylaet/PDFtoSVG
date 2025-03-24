@@ -1,47 +1,55 @@
 package com.genico.ui;
 
+import com.genico.service.PdfToSvgConverter;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.html.H2;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.upload.Upload;
-import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
-import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.upload.receivers.FileBuffer;
 import com.vaadin.flow.router.Route;
+import org.springframework.stereotype.Component;
 
+import java.io.File;
+
+@Component
 @Route("")
 public class MainView extends VerticalLayout {
 
-    private TextField filePathField;
-    private TextField savePathField;
-    private Button convertButton;
+    private final PdfToSvgConverter converter;
+    private final TextField savePathField;
 
-    public MainView() {
-        setSpacing(true);
-        setPadding(true);
+    public MainView(PdfToSvgConverter converter) {
+        this.converter = converter;
+        this.savePathField = new TextField("Папка сохранения");
+        savePathField.setValue("G:/Work/TestFiles");
 
-        H2 title = new H2("PDF to SVG Converter");
-
-        // Поле для выбора файла
-        MemoryBuffer buffer = new MemoryBuffer();
+        FileBuffer buffer = new FileBuffer();
         Upload upload = new Upload(buffer);
         upload.setAcceptedFileTypes("application/pdf");
 
-        filePathField = new TextField("Выбранный файл");
-        filePathField.setReadOnly(true);
+        Button convertButton = new Button("Конвертировать", event -> {
+            File uploadedFile = buffer.getFileData().getFile();
+            if (uploadedFile == null) {
+                Notification.show("Файл не загружен!");
+                return;
+            }
 
-        // Поле для пути сохранения
-        savePathField = new TextField("Папка для сохранения");
+            String saveDir = savePathField.getValue();
+            File saveFolder = new File(saveDir);
+            if (!saveFolder.exists()) {
+                saveFolder.mkdirs();
+            }
 
-        // Кнопка конвертации
-        convertButton = new Button("Конвертировать", event -> {
-            System.out.println("Конвертация запущена...");
+            System.out.println("Запуск конвертации: PDF=" + uploadedFile.getAbsolutePath() + " → " + saveDir);
+            try {
+                converter.convertPdfToSvg(uploadedFile.getAbsolutePath(), saveDir);
+                Notification.show("Конвертация завершена! SVG и JSON сохранены в " + saveDir);
+            } catch (Exception e) {
+                Notification.show("Ошибка конвертации: " + e.getMessage());
+            }
         });
 
-        // Добавляем обработку загрузки файла
-        upload.addSucceededListener(event -> {
-            filePathField.setValue(event.getFileName());
-        });
-
-        add(title, upload, filePathField, savePathField, convertButton);
+        add(savePathField, upload, convertButton);
     }
 }
